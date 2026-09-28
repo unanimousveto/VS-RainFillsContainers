@@ -22,13 +22,25 @@ public class RainFillsContainersModSystem : ModSystem {
         int affectedBlocksCount = 0;
 
         foreach (Block block in api.World.Blocks) {
-            if (block is BlockLiquidContainerBase || block is BlockGroundStorage) {
+            if (
+                block is not BlockPitkiln &&
+                block is not BlockBoiler &&
+                (
+                    block is BlockLiquidContainerBase ||
+                    block is BlockGroundStorage
+                )
+            ) {
                 BlockEntityBehaviorType behavior = new() {
                     Name = "RainFillsContainers.RainFillable",
                     properties = null
                 };
 
                 block.BlockEntityBehaviors = block.BlockEntityBehaviors.Append(behavior);
+
+                api.World.Logger.VerboseDebug(
+                    "Added 'RainFillable' block entity behavior to '{0}'",
+                    block.Code.GetName()
+                );
 
                 affectedBlocksCount++;
             }
