@@ -7,20 +7,30 @@ namespace RainFillsContainers;
 public class BEBehaviorRainFillable : BlockEntityBehavior {
     const int FILL_DELTA_MS = 1000;
 
-    private long fillListener;
+    private long rainListener;
 
     public BEBehaviorRainFillable(BlockEntity blockentity) : base(blockentity) {}
 
     public override void Initialize(ICoreAPI api, JsonObject properties) {
         base.Initialize(api, properties);
 
-        if (api.Side == EnumAppSide.Server) {
-            this.fillListener = api.Event.RegisterGameTickListener(Update, FILL_DELTA_MS);
+        BeginWaitingForRain();
 
-            this.Api.World.Logger.VerboseDebug(
-                "Block at {0} started waiting for rain",
-                [this.Blockentity.Pos]
-            );
+        api.World.Logger.Debug(
+            "Block at ({0}) started waiting for rain",
+            [this.Blockentity.Pos]
+        );
+    }
+
+    private void BeginWaitingForRain() {
+        if (this.Api.Side == EnumAppSide.Server) {
+            this.rainListener = this.Api.Event.RegisterGameTickListener(Update, FILL_DELTA_MS);
+        }
+    }
+
+    private void StopWaitingForRain() {
+        if (this.Api.Side == EnumAppSide.Server) {
+            this.Api.Event.UnregisterGameTickListener(this.rainListener);
         }
     }
 
@@ -71,11 +81,22 @@ public class BEBehaviorRainFillable : BlockEntityBehavior {
         return 0;
     }
 
-    public override void OnBlockRemoved() {
-        this.Api.Event.UnregisterGameTickListener(this.fillListener);
+    public override void OnBlockUnloaded() {
+        StopWaitingForRain();
 
-        this.Api.World.Logger.VerboseDebug(
-            "Block at {0} stopped waiting for rain",
+        this.Api.World.Logger.Debug(
+            "Block at ({0}) stopped waiting for rain (unloaded)",
+            [this.Blockentity.Pos]
+        );
+
+        base.OnBlockUnloaded();
+    }
+
+    public override void OnBlockRemoved() {
+        StopWaitingForRain();
+
+        this.Api.World.Logger.Debug(
+            "Block at ({0}) stopped waiting for rain (removed)",
             [this.Blockentity.Pos]
         );
 
