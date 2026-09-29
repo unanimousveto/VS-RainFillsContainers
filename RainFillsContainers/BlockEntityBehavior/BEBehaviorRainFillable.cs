@@ -1,5 +1,7 @@
+using System.Runtime.CompilerServices;
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
+using Vintagestory.API.MathTools;
 using Vintagestory.GameContent;
 
 namespace RainFillsContainers;
@@ -35,6 +37,10 @@ public class BEBehaviorRainFillable : BlockEntityBehavior {
     }
 
     private void Update(float deltaTime) {
+        // Check if the block is receiving rain
+        if (!IsRainingAt(this.Blockentity.Pos)) return;
+
+        // Try to add water to the block
         ItemStack fluidStack = new(this.Api.World.GetItem(new AssetLocation("waterportion")), 1000);
         float addLitresAmount = 0.1f;
 
@@ -43,6 +49,18 @@ public class BEBehaviorRainFillable : BlockEntityBehavior {
         } else {
             TryPutLiquidToBlockEntity(this.Blockentity, fluidStack, addLitresAmount);
         }
+    }
+
+    public bool IsRainingAt(BlockPos position) {
+        // Check for cover
+        int localRainHeight = this.Api.World.BlockAccessor.GetRainMapHeightAt(
+            position.X,
+            position.Z
+        );
+
+        if (localRainHeight > position.Y) return false;
+
+        return true;
     }
 
     private static float TryPutLiquidToGroundStorage(BlockEntityGroundStorage groundStorage, ItemStack fluidStack, float quantityLitres) {
