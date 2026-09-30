@@ -1,4 +1,3 @@
-using System.Runtime.CompilerServices;
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
@@ -7,7 +6,10 @@ using Vintagestory.GameContent;
 namespace RainFillsContainers;
 
 public class BEBehaviorRainFillable : BlockEntityBehavior {
-    const int FILL_DELTA_MS = 1000;
+    const int FILL_DELTA_MS = 5000;
+    const float MINIMUM_PRECIPITATION = 0.4f;
+
+    private WeatherSystemServer weatherSystem => Api.ModLoader.GetModSystem<WeatherSystemServer>();
 
     private long rainListener;
 
@@ -59,6 +61,11 @@ public class BEBehaviorRainFillable : BlockEntityBehavior {
         );
 
         if (localRainHeight > position.Y) return false;
+
+        // Check for sufficient rain
+        float precipitationRate = this.weatherSystem.GetPrecipitation(position.ToVec3d());
+
+        if (precipitationRate < MINIMUM_PRECIPITATION) return false;
 
         return true;
     }
