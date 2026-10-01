@@ -9,14 +9,15 @@ public class BEBehaviorRainFillable : BlockEntityBehavior {
     const int FILL_DELTA_MS = 5000;
     const float MINIMUM_PRECIPITATION = 0.4f;
 
-    private WeatherSystemServer weatherSystem => Api.ModLoader.GetModSystem<WeatherSystemServer>();
-
+    private WeatherSystemServer weatherSystem;
     private long rainListener;
 
     public BEBehaviorRainFillable(BlockEntity blockentity) : base(blockentity) {}
 
     public override void Initialize(ICoreAPI api, JsonObject properties) {
         base.Initialize(api, properties);
+
+        this.weatherSystem = this.Api.ModLoader.GetModSystem<WeatherSystemServer>();
 
         BeginWaitingForRain();
 
@@ -66,6 +67,17 @@ public class BEBehaviorRainFillable : BlockEntityBehavior {
         float precipitationRate = this.weatherSystem.GetPrecipitation(position.ToVec3d());
 
         if (precipitationRate < MINIMUM_PRECIPITATION) return false;
+
+        // Make sure it isn't snowing
+        float localTemp = this.Api.World.BlockAccessor.GetClimateAt(
+            Pos,
+            EnumGetClimateMode.ForSuppliedDate_TemperatureOnly,
+            Api.World.Calendar.TotalDays
+        ).Temperature;
+
+        float snowThresholdTemp = this.weatherSystem.getWeatherDataReader().BlendedWeatherData.snowThresholdTemp;
+
+        if (localTemp < snowThresholdTemp) return false;
 
         return true;
     }
