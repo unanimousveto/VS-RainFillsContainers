@@ -6,9 +6,9 @@ using Vintagestory.GameContent;
 namespace RainFillsContainers;
 
 public class BEBehaviorRainFillable : BlockEntityBehavior {
-    private RainFillsContainersModSystem Mod;
+    private RainFillsContainersModSystem ModSystem;
 
-    private WeatherSystemServer weatherSystem;
+    private WeatherSystemServer WeatherSystem;
     private long rainListener;
 
     public BEBehaviorRainFillable(BlockEntity blockentity) : base(blockentity) {}
@@ -16,15 +16,15 @@ public class BEBehaviorRainFillable : BlockEntityBehavior {
     public override void Initialize(ICoreAPI api, JsonObject properties) {
         base.Initialize(api, properties);
 
+        this.ModSystem = this.Api.ModLoader.GetModSystem<RainFillsContainersModSystem>();
+        this.WeatherSystem = this.Api.ModLoader.GetModSystem<WeatherSystemServer>();
+
         // Don't run on the client
         if (api.Side != EnumAppSide.Server) return;
 
-        this.Mod = this.Api.ModLoader.GetModSystem<RainFillsContainersModSystem>();
-        this.weatherSystem = this.Api.ModLoader.GetModSystem<WeatherSystemServer>();
-
         BeginWaitingForRain();
 
-        api.World.Logger.Debug(
+        this.ModSystem.Mod.Logger.Debug(
             "Block at ({0}) started waiting for rain",
             [this.Blockentity.Pos]
         );
@@ -33,7 +33,7 @@ public class BEBehaviorRainFillable : BlockEntityBehavior {
     public override void OnBlockUnloaded() {
         StopWaitingForRain();
 
-        this.Api.World.Logger.Debug(
+        this.ModSystem.Mod.Logger.Debug(
             "Block at ({0}) stopped waiting for rain (unloaded)",
             [this.Blockentity.Pos]
         );
@@ -44,7 +44,7 @@ public class BEBehaviorRainFillable : BlockEntityBehavior {
     public override void OnBlockRemoved() {
         StopWaitingForRain();
 
-        this.Api.World.Logger.Debug(
+        this.ModSystem.Mod.Logger.Debug(
             "Block at ({0}) stopped waiting for rain (removed)",
             [this.Blockentity.Pos]
         );
@@ -56,7 +56,7 @@ public class BEBehaviorRainFillable : BlockEntityBehavior {
         if (this.Api.Side == EnumAppSide.Server) {
             this.rainListener = this.Api.Event.RegisterGameTickListener(
                 Update,
-                this.Mod.RainCheckDeltaMS
+                this.ModSystem.RainCheckDeltaMS
             );
         }
     }
@@ -92,9 +92,9 @@ public class BEBehaviorRainFillable : BlockEntityBehavior {
         if (localRainHeight > position.Y) return false;
 
         // Check for sufficient rain
-        float precipitationRate = this.weatherSystem.GetPrecipitation(position.ToVec3d());
+        float precipitationRate = this.WeatherSystem.GetPrecipitation(position.ToVec3d());
 
-        if (precipitationRate < this.Mod.MinimumPrecipitation) return false;
+        if (precipitationRate < this.ModSystem.MinimumPrecipitation) return false;
 
         // Make sure it isn't snowing
         float localTemp = this.Api.World.BlockAccessor.GetClimateAt(
@@ -103,7 +103,7 @@ public class BEBehaviorRainFillable : BlockEntityBehavior {
             Api.World.Calendar.TotalDays
         ).Temperature;
 
-        if (localTemp < this.Mod.SnowThresholdTemp) return false;
+        if (localTemp < this.ModSystem.SnowThresholdTemp) return false;
 
         return true;
     }

@@ -6,12 +6,12 @@ namespace RainFillsContainers;
 
 public class RainFillsContainersModSystem : ModSystem {
     // General settings
-    public float FillRate;
-    public int RainCheckDeltaMS;
+    public float FillRate { get; private set; }
+    public int RainCheckDeltaMS { get; private set; }
 
     // Weather constants
-    public float MinimumPrecipitation;
-    public float SnowThresholdTemp;
+    public float MinimumPrecipitation { get; private set; }
+    public float SnowThresholdTemp { get; private set; }
 
     public override void Start(ICoreAPI api) {
         base.Start(api);
@@ -21,7 +21,7 @@ public class RainFillsContainersModSystem : ModSystem {
             typeof(BEBehaviorRainFillable)
         );
 
-        api.World.Logger.Event("Started 'RainFillsContainers' mod");
+        Mod.Logger.Event("Started 'RainFillsContainers' mod");
     }
 
     public override void AssetsFinalize(ICoreAPI api) {
@@ -30,12 +30,9 @@ public class RainFillsContainersModSystem : ModSystem {
         // Don't run on the client
         if (api.Side != EnumAppSide.Server) return;
 
-        // Set constants
-        this.FillRate = 1.0f;
-        this.RainCheckDeltaMS = 5000;
+        // Load user config or defaults
+        TryLoadConfig(api);
 
-        this.MinimumPrecipitation = 0.04f;
-        
         WeatherSystemServer weatherSystem = api.ModLoader.GetModSystem<WeatherSystemServer>();
         WeatherDataReader weatherData = weatherSystem.getWeatherDataReader();
 
@@ -60,7 +57,7 @@ public class RainFillsContainersModSystem : ModSystem {
 
                 block.BlockEntityBehaviors = block.BlockEntityBehaviors.Append(behavior);
 
-                api.World.Logger.VerboseDebug(
+                Mod.Logger.VerboseDebug(
                     "Added 'RainFillable' block entity behavior to '{0}'",
                     block.Code.GetName()
                 );
@@ -69,9 +66,40 @@ public class RainFillsContainersModSystem : ModSystem {
             }
         }
 
-        api.World.Logger.Debug(
+        Mod.Logger.Debug(
             "Added 'RainFillable' block entity behavior to {0} blocks",
             [affectedBlocksCount]
         );
+    }
+
+    private void TryLoadConfig(ICoreAPI api) {
+        const string CONFIG_NAME = "RainFillsContainers.json";
+
+        RainFillSContainersConfig? config = null;
+
+        try {
+            config = api.LoadModConfig<RainFillSContainersConfig>(CONFIG_NAME);
+        } catch {
+            Mod.Logger.Error(
+                "The config file 'RainFillsContainers.json' could not be loaded"
+            );
+        }
+
+        // No file found (or the file was invalid), use defaults
+        if (config is null) {
+            config = new RainFillSContainersConfig();
+
+            Mod.Logger.Debug(
+                "Using 'RainFillsContainers' default configuration"
+            );
+
+            // Create a new config file with the defaults
+            api.StoreModConfig<RainFillSContainersConfig>(config, CONFIG_NAME);
+        }
+
+        // Set configured values
+        this.FillRate = config.fillRate;
+        this.RainCheckDeltaMS = config.rainCheckDeltaMS;
+        this.MinimumPrecipitation = config.minimumPrecipitation;
     }
 }
