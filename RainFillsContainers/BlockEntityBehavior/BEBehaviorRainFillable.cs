@@ -101,21 +101,26 @@ public class BEBehaviorRainFillable : BlockEntityBehavior {
         float addLitresAmount = 0.1f * portionsToAdd;
 
         // Try to add water to the block
+        float litresAdded = 0.0f;
+
         if (isGroundStorage) {
-            TryPutLiquidToGroundStorage(
+            litresAdded = TryPutLiquidToGroundStorage(
                 (BlockEntityGroundStorage) this.Blockentity,
                 fluidStack,
                 addLitresAmount,
                 requireWater
             );
         } else {
-            TryPutLiquidToBlockEntity(
+            litresAdded = TryPutLiquidToBlockEntity(
                 this.Blockentity,
                 fluidStack,
                 addLitresAmount,
                 requireWater
             );
         }
+
+        // Don't let partial portions accumulate if we aren't filling the container
+        if (litresAdded == 0) this.partialPortions = 0.0f;
     }
 
     public bool IsSnowTemp() {
