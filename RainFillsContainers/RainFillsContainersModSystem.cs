@@ -7,6 +7,7 @@ namespace RainFillsContainers;
 public class RainFillsContainersModSystem : ModSystem {
     // General settings
     public float FillRate { get; private set; }
+    public float SnowFillRate { get; private set; }
     public int RainCheckDeltaMS { get; private set; }
 
     // Weather constants
@@ -99,6 +100,7 @@ public class RainFillsContainersModSystem : ModSystem {
 
         // Set configured values
         this.FillRate = config.fillRate * (config.rainCheckDeltaMS / 5000);
+        this.SnowFillRate = config.snowFillRate;
         this.RainCheckDeltaMS = config.rainCheckDeltaMS;
         this.MinimumPrecipitation = config.minimumPrecipitation;
     }

@@ -69,17 +69,20 @@ public class BEBehaviorRainFillable : BlockEntityBehavior {
     }
 
     private void Update(float deltaTime) {
-        // Ignore snow
-        if (IsSnowTemp()) return;
-
         // Check if it's raining enough
         float precipitation = GetPrecipitation();
         if (precipitation < this.ModSystem.MinimumPrecipitation) return;
 
+        // Get fill rate based on weather type (snow or rain)
+        float evaluatedFillRate = this.ModSystem.FillRate;
+        if (IsSnowTemp()) evaluatedFillRate = this.ModSystem.SnowFillRate;
+
+        if (evaluatedFillRate == 0.0f) return;
+
         ItemStack fluidStack = new(this.Api.World.GetItem(new AssetLocation("waterportion")), 1000);
 
         // Calculate ammount of water to add
-        this.partialPortions += precipitation * this.ModSystem.FillRate / 0.4f;
+        this.partialPortions += precipitation * evaluatedFillRate / 0.4f;
 
         int portionsToAdd = (int) this.partialPortions;
         this.partialPortions -= portionsToAdd;
