@@ -70,6 +70,7 @@ public class BEBehaviorRainFillable : BlockEntityBehavior {
 
     private void Update(float deltaTime) {
         bool requireWater = false;
+        bool isGroundStorage = this.Blockentity is BlockEntityGroundStorage;
 
         // Check if it's raining enough
         float precipitation = GetPrecipitation();
@@ -90,7 +91,8 @@ public class BEBehaviorRainFillable : BlockEntityBehavior {
 
         ItemStack fluidStack = new(this.Api.World.GetItem(new AssetLocation("waterportion")), 1000);
 
-        // Calculate ammount of water to add
+        // Calculate ammount of water to add, potentially reducing it if the block is ground storage
+        if (isGroundStorage) evaluatedFillRate *= this.ModSystem.GroundStorageFillRateMultiplier;
         this.partialPortions += precipitation * evaluatedFillRate / 0.4f;
 
         int portionsToAdd = (int) this.partialPortions;
@@ -99,10 +101,20 @@ public class BEBehaviorRainFillable : BlockEntityBehavior {
         float addLitresAmount = 0.1f * portionsToAdd;
 
         // Try to add water to the block
-        if (this.Blockentity is BlockEntityGroundStorage groundStorage) {
-            TryPutLiquidToGroundStorage(groundStorage, fluidStack, addLitresAmount, requireWater);
+        if (isGroundStorage) {
+            TryPutLiquidToGroundStorage(
+                (BlockEntityGroundStorage) this.Blockentity,
+                fluidStack,
+                addLitresAmount,
+                requireWater
+            );
         } else {
-            TryPutLiquidToBlockEntity(this.Blockentity, fluidStack, addLitresAmount, requireWater);
+            TryPutLiquidToBlockEntity(
+                this.Blockentity,
+                fluidStack,
+                addLitresAmount,
+                requireWater
+            );
         }
     }
 

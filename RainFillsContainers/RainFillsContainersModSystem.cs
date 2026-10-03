@@ -9,6 +9,7 @@ public class RainFillsContainersModSystem : ModSystem {
     public float FillRate { get; private set; }
     public bool SnowRequiresWater { get; private set; }
     public float SnowFillRate { get; private set; }
+    public float GroundStorageFillRateMultiplier { get; private set; }
     public int RainCheckDeltaMS { get; private set; }
 
     // Weather constants
@@ -103,6 +104,7 @@ public class RainFillsContainersModSystem : ModSystem {
         this.FillRate = config.fillRate * (config.rainCheckDeltaMS / 5000);
         this.SnowRequiresWater = config.snowRequiresWater;
         this.SnowFillRate = config.snowFillRate;
+        this.GroundStorageFillRateMultiplier = config.groundStorageFillRateMultiplier;
         this.RainCheckDeltaMS = config.rainCheckDeltaMS;
         this.MinimumPrecipitation = config.minimumPrecipitation;
     }
