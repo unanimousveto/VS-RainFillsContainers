@@ -98,7 +98,7 @@ public class RainFillsContainersModSystem : ModSystem {
         }
 
         // Set configured values
-        this.FillRate = config.fillRate;
+        this.FillRate = config.fillRate * (config.rainCheckDeltaMS / 5000);
         this.RainCheckDeltaMS = config.rainCheckDeltaMS;
         this.MinimumPrecipitation = config.minimumPrecipitation;
     }

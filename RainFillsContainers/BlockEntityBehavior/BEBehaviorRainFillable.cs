@@ -10,6 +10,7 @@ public class BEBehaviorRainFillable : BlockEntityBehavior {
 
     private WeatherSystemServer WeatherSystem;
     private long rainListener;
+    private float partialPortions = 0;
 
     public BEBehaviorRainFillable(BlockEntity blockentity) : base(blockentity) {}
 
@@ -68,13 +69,24 @@ public class BEBehaviorRainFillable : BlockEntityBehavior {
     }
 
     private void Update(float deltaTime) {
-        // Check if the block is receiving rain
-        if (!IsRainingAt(this.Blockentity.Pos)) return;
+        // Ignore snow
+        if (IsSnowTemp()) return;
+
+        // Check if it's raining enough
+        float precipitation = GetPrecipitation();
+        if (precipitation < this.ModSystem.MinimumPrecipitation) return;
+
+        ItemStack fluidStack = new(this.Api.World.GetItem(new AssetLocation("waterportion")), 1000);
+
+        // Calculate ammount of water to add
+        this.partialPortions += precipitation * this.ModSystem.FillRate / 0.4f;
+
+        int portionsToAdd = (int) this.partialPortions;
+        this.partialPortions -= portionsToAdd;
+
+        float addLitresAmount = 0.1f * portionsToAdd;
 
         // Try to add water to the block
-        ItemStack fluidStack = new(this.Api.World.GetItem(new AssetLocation("waterportion")), 1000);
-        float addLitresAmount = 0.1f;
-
         if (this.Blockentity is BlockEntityGroundStorage groundStorage) {
             TryPutLiquidToGroundStorage(groundStorage, fluidStack, addLitresAmount);
         } else {
@@ -82,30 +94,33 @@ public class BEBehaviorRainFillable : BlockEntityBehavior {
         }
     }
 
-    public bool IsRainingAt(BlockPos position) {
+    public bool IsSnowTemp() {
+        BlockPos position = this.Blockentity.Pos;
+
+        float localTemp = this.Api.World.BlockAccessor.GetClimateAt(
+            position,
+            EnumGetClimateMode.ForSuppliedDate_TemperatureOnly,
+            Api.World.Calendar.TotalDays
+        ).Temperature;
+
+        return localTemp < this.ModSystem.SnowThresholdTemp;
+    }
+
+    public float GetPrecipitation() {
+        BlockPos position = this.Blockentity.Pos;
+
         // Check for cover
         int localRainHeight = this.Api.World.BlockAccessor.GetRainMapHeightAt(
             position.X,
             position.Z
         );
 
-        if (localRainHeight > position.Y) return false;
+        if (localRainHeight > position.Y) return 0.0f;
 
         // Check for sufficient rain
         float precipitationRate = this.WeatherSystem.GetPrecipitation(position.ToVec3d());
 
-        if (precipitationRate < this.ModSystem.MinimumPrecipitation) return false;
-
-        // Make sure it isn't snowing
-        float localTemp = this.Api.World.BlockAccessor.GetClimateAt(
-            Pos,
-            EnumGetClimateMode.ForSuppliedDate_TemperatureOnly,
-            Api.World.Calendar.TotalDays
-        ).Temperature;
-
-        if (localTemp < this.ModSystem.SnowThresholdTemp) return false;
-
-        return true;
+        return precipitationRate;
     }
 
     private static float TryPutLiquidToGroundStorage(BlockEntityGroundStorage groundStorage, ItemStack fluidStack, float quantityLitres) {
