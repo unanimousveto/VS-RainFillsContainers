@@ -7,4 +7,8 @@ public class RainFillSContainersConfig {
     public float groundStorageFillRateMultiplier = 0.25f;
     public int rainCheckDeltaMS = 5000;
     public float minimumPrecipitation = 0.04f;
+
+    public string[] blockBlacklist = [
+        "verticalboiler-*"
+    ];
 }

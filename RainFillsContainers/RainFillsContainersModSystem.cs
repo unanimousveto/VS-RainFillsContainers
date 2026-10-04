@@ -1,4 +1,6 @@
-﻿using Vintagestory.API.Common;
+﻿using System.Collections.Generic;
+using System.Linq;
+using Vintagestory.API.Common;
 using Vintagestory.API.Util;
 using Vintagestory.GameContent;
 
@@ -15,6 +17,9 @@ public class RainFillsContainersModSystem : ModSystem {
     // Weather constants
     public float MinimumPrecipitation { get; private set; }
     public float SnowThresholdTemp { get; private set; }
+
+    // Block blacklist
+    private string[] BlockBlacklist = [];
 
     public override void Start(ICoreAPI api) {
         base.Start(api);
@@ -43,16 +48,27 @@ public class RainFillsContainersModSystem : ModSystem {
 
         // Add the RainFillable behavior to blocks
         int affectedBlocksCount = 0;
+        int blacklistedBlocksCount = 0;
 
         foreach (Block block in api.World.Blocks) {
-            if (
-                block is not BlockPitkiln &&
-                block is not BlockBoiler &&
+            if (block is not BlockPitkiln &&
                 (
                     block is BlockLiquidContainerBase ||
                     block is BlockGroundStorage
                 )
             ) {
+                string blockName = block.Code.ToString();
+
+                if (IsBlockBlacklisted(block)) {
+                    this.Mod.Logger.VerboseDebug(
+                        "Skipped adding 'RainFillable' block entity behavior to '{0}' (blacklisted)",
+                        blockName
+                    );
+
+                    blacklistedBlocksCount++;
+                    continue;
+                }
+
                 BlockEntityBehaviorType behavior = new() {
                     Name = "RainFillsContainers.RainFillable",
                     properties = null
@@ -62,7 +78,7 @@ public class RainFillsContainersModSystem : ModSystem {
 
                 Mod.Logger.VerboseDebug(
                     "Added 'RainFillable' block entity behavior to '{0}'",
-                    block.Code.GetName()
+                    blockName
                 );
 
                 affectedBlocksCount++;
@@ -72,6 +88,12 @@ public class RainFillsContainersModSystem : ModSystem {
         Mod.Logger.Debug(
             "Added 'RainFillable' block entity behavior to {0} blocks",
             [affectedBlocksCount]
+        );
+
+        Mod.Logger.Debug(
+            "Blacklist blocked {0} ({1} listed) blocks from receiving the 'RainFillable' block entity behavior",
+            blacklistedBlocksCount,
+            this.BlockBlacklist.Length
         );
     }
 
@@ -107,5 +129,26 @@ public class RainFillsContainersModSystem : ModSystem {
         this.GroundStorageFillRateMultiplier = config.groundStorageFillRateMultiplier;
         this.RainCheckDeltaMS = config.rainCheckDeltaMS;
         this.MinimumPrecipitation = config.minimumPrecipitation;
+        
+        // Transcribe block blacklist, taking care to add domains to vanilla blocks
+        List<string> tempBlocklist = [];
+
+        foreach (string blockName in config.blockBlacklist) {
+            if (!blockName.Contains(':')) {
+                tempBlocklist.Add("game:" + blockName);
+            } else {
+                tempBlocklist.Add(blockName);
+            }
+        }
+
+        this.BlockBlacklist = tempBlocklist.ToArray();
+    }
+
+    private bool IsBlockBlacklisted(Block block) {
+        foreach (string entry in this.BlockBlacklist) {
+            if (WildcardUtil.Match(AssetLocation.Create(entry), block.Code)) return true;
+        }
+
+        return false;
     }
 }
