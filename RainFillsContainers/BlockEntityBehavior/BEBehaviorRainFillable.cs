@@ -72,6 +72,9 @@ public class BEBehaviorRainFillable : BlockEntityBehavior {
         bool requireWater = false;
         bool isGroundStorage = this.Blockentity is BlockEntityGroundStorage;
 
+        // For barrels, check the seal state
+        if (this.Blockentity is BlockEntityBarrel barrel && barrel.Sealed) return;
+
         // Check if it's raining enough
         float precipitation = GetPrecipitation();
         if (precipitation < this.ModSystem.MinimumPrecipitation) return;
