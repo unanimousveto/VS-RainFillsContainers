@@ -54,7 +54,8 @@ public class RainFillsContainersModSystem : ModSystem {
             if (block is not BlockPitkiln &&
                 (
                     block is BlockLiquidContainerBase ||
-                    block is BlockGroundStorage
+                    block is BlockGroundStorage ||
+                    block is BlockShelf
                 )
             ) {
                 string blockName = block.Code.ToString();

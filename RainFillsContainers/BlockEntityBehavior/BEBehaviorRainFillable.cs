@@ -70,7 +70,6 @@ public class BEBehaviorRainFillable : BlockEntityBehavior {
 
     private void Update(float deltaTime) {
         bool requireWater = false;
-        bool isGroundStorage = this.Blockentity is BlockEntityGroundStorage;
 
         // For barrels, check the seal state
         if (this.Blockentity is BlockEntityBarrel barrel && barrel.Sealed) return;
@@ -92,11 +91,15 @@ public class BEBehaviorRainFillable : BlockEntityBehavior {
 
         if (evaluatedFillRate == 0.0f) return;
 
-        ItemStack fluidStack = new(this.Api.World.GetItem(new AssetLocation("waterportion")), 1000);
-
+        bool isGroundStorage = this.Blockentity is BlockEntityGroundStorage;
+        bool isShelf = this.Blockentity is BlockEntityShelf;
+        
         // Calculate ammount of water to add, potentially reducing it if the block is ground storage
-        if (isGroundStorage) evaluatedFillRate *= this.ModSystem.GroundStorageFillRateMultiplier;
+        if (isGroundStorage || isShelf) evaluatedFillRate *= this.ModSystem.GroundStorageFillRateMultiplier;
         this.partialPortions += precipitation * evaluatedFillRate / 0.4f;
+
+        // Too little to add
+        if (this.partialPortions < 1.0f) return;
 
         int portionsToAdd = (int) this.partialPortions;
         this.partialPortions -= portionsToAdd;
@@ -104,11 +107,19 @@ public class BEBehaviorRainFillable : BlockEntityBehavior {
         float addLitresAmount = 0.1f * portionsToAdd;
 
         // Try to add water to the block
+        ItemStack fluidStack = new(this.Api.World.GetItem(new AssetLocation("waterportion")), 1000);
         float litresAdded = 0.0f;
 
         if (isGroundStorage) {
             litresAdded = TryPutLiquidToGroundStorage(
                 (BlockEntityGroundStorage) this.Blockentity,
+                fluidStack,
+                addLitresAmount,
+                requireWater
+            );
+        } else if (isShelf) {
+            litresAdded = TryPutLiquidToTopShelf(
+                (BlockEntityShelf) this.Blockentity,
                 fluidStack,
                 addLitresAmount,
                 requireWater
@@ -155,6 +166,21 @@ public class BEBehaviorRainFillable : BlockEntityBehavior {
         return precipitationRate;
     }
 
+    private static float TryPutLiquidToItemstack(ItemStack itemStack, ItemStack fluidStack, float quantityLitres, bool requireWater = false) {
+        if (itemStack?.Collectible is BlockLiquidContainerBase container &&
+            !container.IsFull(itemStack)
+        ) {
+            // For snow, make sure this container already holds water to melt into
+            if (requireWater &&
+                container.GetContent(itemStack)?.Id != fluidStack.Id
+            ) return 0.0f;
+
+            return container.TryPutLiquid(itemStack, fluidStack, quantityLitres);
+        }
+
+        return 0.0f;
+    }
+
     private static float TryPutLiquidToGroundStorage(BlockEntityGroundStorage groundStorage, ItemStack fluidStack, float quantityLitres, bool requireWater = false) {
         EnumGroundStorageLayout layout = groundStorage.StorageProps.Layout;
 
@@ -167,21 +193,35 @@ public class BEBehaviorRainFillable : BlockEntityBehavior {
         float totalLitresAdded = 0.0f;
 
         for (int slotIndex = 0; slotIndex < searchSlotCount; slotIndex++) {
-            ItemSlot item = groundStorage.Inventory[slotIndex];
+            ItemStack? stack = groundStorage.Inventory[slotIndex].Itemstack;
+            if (stack == null) continue;
 
-            if (item.Itemstack?.Collectible is BlockLiquidContainerBase container &&
-                !container.IsFull(item.Itemstack)
-            ) {
-                // For snow, make sure this container already holds water to melt into
-                if (requireWater &&
-                    container.GetContent(item.Itemstack)?.Id != fluidStack.Id
-                ) continue;
-
-                totalLitresAdded += container.TryPutLiquid(item.Itemstack, fluidStack, quantityLitres);
-            }
+            totalLitresAdded += TryPutLiquidToItemstack(stack, fluidStack, quantityLitres, requireWater);
         }
 
         if (totalLitresAdded > 0) groundStorage.MarkDirty(true);
+
+        return totalLitresAdded;
+    }
+
+    private static float TryPutLiquidToTopShelf(BlockEntityShelf shelf, ItemStack fluidStack, float quantityLitres, bool requireWater = false) {
+        // Only check the top shelf (indices 4-7, inclusive)
+        int startIndex = 4;
+
+        // For the halved layout, only check every other slot
+        int stride = 1;
+        if (BlockEntityShelf.GetShelvableLayout(shelf.Inventory[4].Itemstack) == EnumShelvableLayout.Halves) stride = 2;
+
+        float totalLitresAdded = 0.0f;
+
+        for (int slotIndex = startIndex; slotIndex < 8; slotIndex += stride) {
+            ItemStack? stack = shelf.Inventory[slotIndex].Itemstack;
+            if (stack == null) continue;
+
+            totalLitresAdded += TryPutLiquidToItemstack(stack, fluidStack, quantityLitres, requireWater);
+        }
+
+        if (totalLitresAdded > 0) shelf.MarkDirty(true);
 
         return totalLitresAdded;
     }
