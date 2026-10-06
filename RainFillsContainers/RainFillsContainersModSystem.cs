@@ -9,7 +9,8 @@ namespace RainFillsContainers;
 public class RainFillsContainersModSystem : ModSystem {
     const string CONFIG_NAME = "RainFillsContainers.json";
 
-    private RainFillSContainersConfig config = new();
+    private RainFillsContainersConfig config = new();
+    private RainFillsContainersConfig overridenConfig = new();
 
     // General settings
     public int RainCheckDeltaMS => config.rainCheckDeltaMS;
@@ -100,10 +101,10 @@ public class RainFillsContainersModSystem : ModSystem {
     }
 
     private void TryLoadConfig(ICoreAPI api) {
-        RainFillSContainersConfig defaultConfig = new();
+        RainFillsContainersConfig defaultConfig = new();
 
         try {
-            this.config = api.LoadModConfig<RainFillSContainersConfig>(CONFIG_NAME);
+            this.config = api.LoadModConfig<RainFillsContainersConfig>(CONFIG_NAME);
         } catch {
             Mod.Logger.Error(
                 "The config file 'RainFillsContainers.json' could not be loaded"
@@ -140,7 +141,7 @@ public class RainFillsContainersModSystem : ModSystem {
             );
         }
 
-        if (this.config.fillRate <= 0.0f) {
+        if (this.config.fillRate < 0.0f) {
             this.config.fillRate = defaultConfig.fillRate;
 
             this.Mod.Logger.Warning(
@@ -150,7 +151,7 @@ public class RainFillsContainersModSystem : ModSystem {
             );
         }
 
-        if (this.config.smallStorageFillRateMultiplier <= 0.0f) {
+        if (this.config.smallStorageFillRateMultiplier < 0.0f) {
             this.config.smallStorageFillRateMultiplier = defaultConfig.smallStorageFillRateMultiplier;
 
             this.Mod.Logger.Warning(
@@ -160,7 +161,7 @@ public class RainFillsContainersModSystem : ModSystem {
             );
         }
 
-        if (this.config.snowFillRateMultiplier <= 0.0f) {
+        if (this.config.snowFillRateMultiplier < 0.0f) {
             this.config.snowFillRateMultiplier = defaultConfig.snowFillRateMultiplier;
 
             this.Mod.Logger.Warning(
@@ -170,9 +171,13 @@ public class RainFillsContainersModSystem : ModSystem {
             );
         }
 
+        // Save a copy of the current config as the overriden config,
+        // in case restore is called without any changes
+        this.overridenConfig = new RainFillsContainersConfig(this.config);
+
         // Write the validated config to prevent future errors,
         // and add any previously unset options
-        api.StoreModConfig<RainFillSContainersConfig>(this.config, CONFIG_NAME);
+        UpdateConfigFile(api);
     }
 
     private bool IsBlockBlacklisted(Block block) {
@@ -181,5 +186,72 @@ public class RainFillsContainersModSystem : ModSystem {
         }
 
         return false;
+    }
+
+    public float OverrideMinimumPrecipitation(float minimumPrecipitation) {
+        if (minimumPrecipitation < 0.0f) {
+            this.overridenConfig.minimumPrecipitation = this.config.minimumPrecipitation;
+            this.config.minimumPrecipitation = minimumPrecipitation;
+        }
+
+        return this.config.minimumPrecipitation;
+    }
+
+    public void RestoreMinimumPrecipitation() {
+        this.config.minimumPrecipitation = this.overridenConfig.minimumPrecipitation;
+    }
+
+    public float OverrideFillRate(float fillRate) {
+        if (fillRate < 0.0f) {
+            this.overridenConfig.fillRate = this.config.fillRate;
+            this.config.fillRate = fillRate;
+        }
+
+        return this.config.fillRate;
+    }
+
+    public void RestoreFillRate() {
+        this.config.fillRate = this.overridenConfig.fillRate;
+    }
+
+    public float OverrideSmallStorageFillRateMultiplier(float smallStorageFillRateMultiplier) {
+        if (smallStorageFillRateMultiplier < 0.0f) {
+            this.overridenConfig.smallStorageFillRateMultiplier = this.config.smallStorageFillRateMultiplier;
+            this.config.smallStorageFillRateMultiplier = smallStorageFillRateMultiplier;
+        }
+
+        return this.config.smallStorageFillRateMultiplier;
+    }
+
+    public void RestoreSmallStorageFillRateMultiplier() {
+        this.config.smallStorageFillRateMultiplier = this.overridenConfig.smallStorageFillRateMultiplier;
+    }
+
+    public float OverrideSnowFillRateMultiplier(float snowFillRateMultiplier) {
+        if (snowFillRateMultiplier > 0.0f) {
+            this.overridenConfig.snowFillRateMultiplier = this.config.snowFillRateMultiplier;
+            this.config.snowFillRateMultiplier = snowFillRateMultiplier;
+        }
+
+        return this.config.snowFillRateMultiplier;
+    }
+
+    public void RestoreSnowFillRateMultiplier() {
+        this.config.snowFillRateMultiplier = this.overridenConfig.snowFillRateMultiplier;
+    }
+
+    public bool OverrideSnowRequiresWater(bool snowRequiresWater) {
+        this.overridenConfig.snowRequiresWater = this.config.snowRequiresWater;
+        this.config.snowRequiresWater = snowRequiresWater;
+
+        return this.config.snowRequiresWater;
+    }
+
+    public void RestoreSnowRequiresWater() {
+        this.config.snowRequiresWater = this.overridenConfig.snowRequiresWater;
+    }
+
+    private void UpdateConfigFile(ICoreAPI api) {
+        api.StoreModConfig<RainFillsContainersConfig>(this.config, CONFIG_NAME);
     }
 }

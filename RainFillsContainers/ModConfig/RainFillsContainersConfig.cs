@@ -1,6 +1,8 @@
+using Vintagestory.API.Util;
+
 namespace RainFillsContainers;
 
-public class RainFillSContainersConfig {
+public class RainFillsContainersConfig {
     public int rainCheckDeltaMS = 5000;
     public float minimumPrecipitation = 0.04f;
     public float fillRate = 1.0f;
@@ -11,4 +13,17 @@ public class RainFillSContainersConfig {
     public string[] blockBlacklist = [
         "verticalboiler-*"
     ];
+
+    public RainFillsContainersConfig() {}
+
+    // Copy constructor
+    public RainFillsContainersConfig(RainFillsContainersConfig config) {
+        this.rainCheckDeltaMS = config.rainCheckDeltaMS;
+        this.minimumPrecipitation = config.minimumPrecipitation;
+        this.fillRate = config.fillRate;
+        this.snowFillRateMultiplier = config.snowFillRateMultiplier;
+        this.smallStorageFillRateMultiplier = config.smallStorageFillRateMultiplier;
+        this.snowRequiresWater = config.snowRequiresWater;
+        this.blockBlacklist = config.blockBlacklist.FastCopy(config.blockBlacklist.Length);
+    }
 }
