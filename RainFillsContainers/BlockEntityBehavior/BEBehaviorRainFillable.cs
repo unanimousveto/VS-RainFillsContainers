@@ -78,11 +78,11 @@ public class BEBehaviorRainFillable : BlockEntityBehavior {
         float precipitation = GetPrecipitation();
         if (precipitation < this.ModSystem.MinimumPrecipitation) return;
 
-        // Get fill rate based on weather type (snow or rain)
-        float evaluatedFillRate = this.ModSystem.FillRate;
+        // Get fill rate based on weather type (snow or rain), adjusted for tick rate
+        float evaluatedFillRate = this.ModSystem.FillRate * (this.ModSystem.RainCheckDeltaMS / 5000);
 
         if (IsSnowTemp()) {
-            evaluatedFillRate = this.ModSystem.SnowFillRate;
+            evaluatedFillRate *= this.ModSystem.SnowFillRateMultiplier;
 
             // If this is true, water must already be present in the container
             // before snow will melt and further fill the container
@@ -91,11 +91,13 @@ public class BEBehaviorRainFillable : BlockEntityBehavior {
 
         if (evaluatedFillRate == 0.0f) return;
 
+        // Adjust fill rate for small storages
         bool isGroundStorage = this.Blockentity is BlockEntityGroundStorage;
         bool isShelf = this.Blockentity is BlockEntityShelf;
         
-        // Calculate ammount of water to add, potentially reducing it if the block is ground storage
-        if (isGroundStorage || isShelf) evaluatedFillRate *= this.ModSystem.GroundStorageFillRateMultiplier;
+        if (isGroundStorage || isShelf) evaluatedFillRate *= this.ModSystem.SmallStorageFillRateMultiplier;
+
+        // Evaluate amount of rain added
         this.partialPortions += precipitation * evaluatedFillRate / 0.4f;
 
         // Too little to add

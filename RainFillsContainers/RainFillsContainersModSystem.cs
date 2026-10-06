@@ -7,11 +7,13 @@ using Vintagestory.GameContent;
 namespace RainFillsContainers;
 
 public class RainFillsContainersModSystem : ModSystem {
+    const string CONFIG_NAME = "RainFillsContainers.json";
+
     // General settings
     public float FillRate { get; private set; }
     public bool SnowRequiresWater { get; private set; }
-    public float SnowFillRate { get; private set; }
-    public float GroundStorageFillRateMultiplier { get; private set; }
+    public float SnowFillRateMultiplier { get; private set; }
+    public float SmallStorageFillRateMultiplier { get; private set; }
     public int RainCheckDeltaMS { get; private set; }
 
     // Weather constants
@@ -99,8 +101,7 @@ public class RainFillsContainersModSystem : ModSystem {
     }
 
     private void TryLoadConfig(ICoreAPI api) {
-        const string CONFIG_NAME = "RainFillsContainers.json";
-
+        RainFillSContainersConfig defaultConfig = new();
         RainFillSContainersConfig? config = null;
 
         try {
@@ -113,23 +114,84 @@ public class RainFillsContainersModSystem : ModSystem {
 
         // No file found (or the file was invalid), use defaults
         if (config is null) {
-            config = new RainFillSContainersConfig();
+            config = defaultConfig;
 
             Mod.Logger.Debug(
                 "Using 'RainFillsContainers' default configuration"
             );
-
-            // Create a new config file with the defaults
-            api.StoreModConfig<RainFillSContainersConfig>(config, CONFIG_NAME);
         }
 
-        // Set configured values
-        this.FillRate = config.fillRate * (config.rainCheckDeltaMS / 5000);
+        // Validate configuration values
+        if (config.fillRate > 0.0f) {
+            this.FillRate = config.fillRate;
+        } else {
+            this.FillRate = defaultConfig.fillRate;
+            config.fillRate = defaultConfig.fillRate;
+
+            this.Mod.Logger.Error(
+                "Configuration 'fillRate' must be a float greater than 0, " +
+                "switching to default value {0}",
+                defaultConfig.fillRate
+            );
+        }
+
+        if (config.snowFillRateMultiplier > 0.0f) {
+            this.SnowFillRateMultiplier = config.snowFillRateMultiplier;
+        } else {
+            this.SnowFillRateMultiplier = defaultConfig.snowFillRateMultiplier;
+            config.snowFillRateMultiplier = defaultConfig.snowFillRateMultiplier;
+
+            this.Mod.Logger.Error(
+                "Configuration 'snowFillRateMultiplier' must be greater than 0, " +
+                "switching to default value {0}",
+                defaultConfig.snowFillRateMultiplier
+            );
+        }
+
+        if (config.smallStorageFillRateMultiplier > 0.0f) {
+            this.SmallStorageFillRateMultiplier = config.smallStorageFillRateMultiplier;
+        } else {
+            this.SmallStorageFillRateMultiplier = defaultConfig.smallStorageFillRateMultiplier;
+            config.smallStorageFillRateMultiplier = defaultConfig.smallStorageFillRateMultiplier;
+
+            this.Mod.Logger.Error(
+                "Configuration 'smallStorageFillRateMultiplier' must be greater than 0, " +
+                "switching to default value {0}",
+                defaultConfig.smallStorageFillRateMultiplier
+            );
+        }
+
+        if (config.rainCheckDeltaMS > 0) {
+            this.RainCheckDeltaMS = config.rainCheckDeltaMS;
+        } else {
+            this.RainCheckDeltaMS = defaultConfig.rainCheckDeltaMS;
+            config.rainCheckDeltaMS = defaultConfig.rainCheckDeltaMS;
+
+            this.Mod.Logger.Error(
+                "Configuration 'rainCheckDeltaMS' must be greater than 0, " +
+                "switching to default value {0}",
+                defaultConfig.rainCheckDeltaMS
+            );
+        }
+
+        if (config.minimumPrecipitation >= 0.0f) {
+            this.MinimumPrecipitation = config.minimumPrecipitation;
+        } else {
+            this.MinimumPrecipitation = defaultConfig.minimumPrecipitation;
+            config.minimumPrecipitation = defaultConfig.minimumPrecipitation;
+
+            this.Mod.Logger.Error(
+                "Configuration 'minimumPrecipitation' must be greater than or equal to 0, " +
+                "switching to default value {0}",
+                defaultConfig.minimumPrecipitation
+            );
+        }
+
         this.SnowRequiresWater = config.snowRequiresWater;
-        this.SnowFillRate = config.snowFillRate;
-        this.GroundStorageFillRateMultiplier = config.groundStorageFillRateMultiplier;
-        this.RainCheckDeltaMS = config.rainCheckDeltaMS;
-        this.MinimumPrecipitation = config.minimumPrecipitation;
+
+        // Write the validated config to prevent future errors,
+        // and add any previously unset options
+        api.StoreModConfig<RainFillSContainersConfig>(config, CONFIG_NAME);
         
         // Transcribe block blacklist, taking care to add domains to vanilla blocks
         List<string> tempBlocklist = [];
