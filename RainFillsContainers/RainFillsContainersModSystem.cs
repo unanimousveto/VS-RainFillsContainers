@@ -1,6 +1,7 @@
-﻿using System.Collections.Generic;
-using System.Linq;
+﻿using System.Linq;
+using System.Text;
 using Vintagestory.API.Common;
+using Vintagestory.API.Server;
 using Vintagestory.API.Util;
 using Vintagestory.GameContent;
 
@@ -9,8 +10,10 @@ namespace RainFillsContainers;
 public class RainFillsContainersModSystem : ModSystem {
     const string CONFIG_NAME = "RainFillsContainers.json";
 
+    private ICoreAPI Api;
+
     private RainFillsContainersConfig config = new();
-    private RainFillsContainersConfig overridenConfig = new();
+    private RainFillsContainersConfig defaultConfig = new();
 
     // General settings
     public int RainCheckDeltaMS => config.rainCheckDeltaMS;
@@ -39,11 +42,12 @@ public class RainFillsContainersModSystem : ModSystem {
 
         // Don't run on the client
         if (api.Side != EnumAppSide.Server) return;
+        this.Api = api;
 
         // Load user config or defaults
-        TryLoadConfig(api);
+        TryLoadConfig();
 
-        WeatherSystemServer weatherSystem = api.ModLoader.GetModSystem<WeatherSystemServer>();
+        WeatherSystemServer weatherSystem = this.Api.ModLoader.GetModSystem<WeatherSystemServer>();
         WeatherDataReader weatherData = weatherSystem.getWeatherDataReader();
 
         this.SnowThresholdTemp = weatherData.BlendedWeatherData.snowThresholdTemp;
@@ -52,7 +56,7 @@ public class RainFillsContainersModSystem : ModSystem {
         int affectedBlocksCount = 0;
         int blacklistedBlocksCount = 0;
 
-        foreach (Block block in api.World.Blocks) {
+        foreach (Block block in this.Api.World.Blocks) {
             if (block is not BlockPitkiln &&
                 (
                     block is BlockLiquidContainerBase ||
@@ -98,13 +102,13 @@ public class RainFillsContainersModSystem : ModSystem {
             blacklistedBlocksCount,
             this.config.blockBlacklist.Length
         );
+
+        RegisterCommands();
     }
 
-    private void TryLoadConfig(ICoreAPI api) {
-        RainFillsContainersConfig defaultConfig = new();
-
+    private void TryLoadConfig() {
         try {
-            this.config = api.LoadModConfig<RainFillsContainersConfig>(CONFIG_NAME);
+            this.config = this.Api.LoadModConfig<RainFillsContainersConfig>(CONFIG_NAME);
         } catch {
             Mod.Logger.Error(
                 "The config file 'RainFillsContainers.json' could not be loaded"
@@ -113,7 +117,7 @@ public class RainFillsContainersModSystem : ModSystem {
 
         // No file found (or the file was invalid), use defaults
         if (this.config is null) {
-            this.config = defaultConfig;
+            this.config = new();
 
             Mod.Logger.Debug(
                 "Using 'RainFillsContainers' default configuration"
@@ -122,62 +126,59 @@ public class RainFillsContainersModSystem : ModSystem {
 
         // Validate configuration values
         if (this.config.rainCheckDeltaMS <= 0) {
-            this.config.rainCheckDeltaMS = defaultConfig.rainCheckDeltaMS;
+            this.config.rainCheckDeltaMS = this.defaultConfig.rainCheckDeltaMS;
 
             this.Mod.Logger.Warning(
                 "Configuration 'rainCheckDeltaMS' must be greater than 0, " +
                 "switching to default value {0}",
-                defaultConfig.rainCheckDeltaMS
+                this.defaultConfig.rainCheckDeltaMS
             );
         }
 
         if (this.config.minimumPrecipitation < 0.0f) {
-            this.config.minimumPrecipitation = defaultConfig.minimumPrecipitation;
+            this.config.minimumPrecipitation = this.defaultConfig.minimumPrecipitation;
 
             this.Mod.Logger.Warning(
                 "Configuration 'minimumPrecipitation' must be greater than or equal to 0, " +
                 "switching to default value {0}",
-                defaultConfig.minimumPrecipitation
+                this.defaultConfig.minimumPrecipitation
             );
         }
 
         if (this.config.fillRate < 0.0f) {
-            this.config.fillRate = defaultConfig.fillRate;
+            this.config.fillRate = this.defaultConfig.fillRate;
 
             this.Mod.Logger.Warning(
                 "Configuration 'fillRate' must be a float greater than 0, " +
                 "switching to default value {0}",
-                defaultConfig.fillRate
+                this.defaultConfig.fillRate
             );
         }
 
         if (this.config.smallStorageFillRateMultiplier < 0.0f) {
-            this.config.smallStorageFillRateMultiplier = defaultConfig.smallStorageFillRateMultiplier;
+            this.config.smallStorageFillRateMultiplier = this.defaultConfig.smallStorageFillRateMultiplier;
 
             this.Mod.Logger.Warning(
                 "Configuration 'smallStorageFillRateMultiplier' must be greater than 0, " +
                 "switching to default value {0}",
-                defaultConfig.smallStorageFillRateMultiplier
+                this.defaultConfig.smallStorageFillRateMultiplier
             );
         }
 
         if (this.config.snowFillRateMultiplier < 0.0f) {
-            this.config.snowFillRateMultiplier = defaultConfig.snowFillRateMultiplier;
+            this.config.snowFillRateMultiplier = this.defaultConfig.snowFillRateMultiplier;
 
             this.Mod.Logger.Warning(
                 "Configuration 'snowFillRateMultiplier' must be greater than 0, " +
                 "switching to default value {0}",
-                defaultConfig.snowFillRateMultiplier
+                this.defaultConfig.snowFillRateMultiplier
             );
         }
 
-        // Save a copy of the current config as the overriden config,
-        // in case restore is called without any changes
-        this.overridenConfig = new RainFillsContainersConfig(this.config);
-
         // Write the validated config to prevent future errors,
         // and add any previously unset options
-        UpdateConfigFile(api);
+        // (also ensures that the stored defaults match the file)
+        UpdateConfigFile();
     }
 
     private bool IsBlockBlacklisted(Block block) {
@@ -187,71 +188,270 @@ public class RainFillsContainersModSystem : ModSystem {
 
         return false;
     }
+    
+    private void RegisterCommands() {
+        this.Api.ChatCommands.Create("rainfillscontainers")
+        .WithDescription(
+            "Running without a subcommand will show active configuration values."
+        )
+        .RequiresPrivilege(Privilege.controlserver)
+        .HandleWith(CmdGetInfo)
+
+        // Sub-commands to override values
+        .BeginSubCommand("minprecip")
+            .WithDescription(
+                "Running with a negative argument resets the value to match the config file. " +
+                "Otherwise, the minimum precipitation level will be overridden " +
+                "(note that fill rate scales linearly with precipitation rate, " +
+                "so modifications to this cutoff value will not frequently be apparent)."
+            )
+            .WithArgs(this.Api.ChatCommands.Parsers.Float("precipitation-level"))
+            .HandleWith(CmdOverrideMinimumPrecipitation)
+        .EndSubCommand()
+
+        .BeginSubCommand("fillrate")
+            .WithDescription(
+                "Running with a negative argument resets the value to match the config file. " +
+                "Otherwise, the fill rate will be overridden."
+            )
+            .WithArgs(this.Api.ChatCommands.Parsers.Float("fill-rate"))
+            .HandleWith(CmdOverrideFillRate)
+        .EndSubCommand()
+
+        .BeginSubCommand("smallfillrate")
+            .WithDescription(
+                "Running with a negative argument resets the value to match the config file. " +
+                "Otherwise, the small storage fill rate multiplier will be overridden."
+            )
+            .WithArgs(this.Api.ChatCommands.Parsers.Float("small-storage-fill-multiplier"))
+            .HandleWith(CmdOverrideSmallStorageFillRate)
+        .EndSubCommand()
+
+        .BeginSubCommand("snowfillrate")
+            .WithDescription(
+                "Running with a negative argument resets the value to match the config file. " +
+                "Otherwise, the snow fill rate multiplier will be overridden."
+            )
+            .WithArgs(this.Api.ChatCommands.Parsers.Float("snow-fill-multiplier"))
+            .HandleWith(CmdOverrideSnowFillRate)
+        .EndSubCommand()
+
+        .BeginSubCommand("snowrequireswater")
+            .WithDescription(
+                "Overrides the requirement of water before snow will melt into a container."
+            )
+            .WithArgs(this.Api.ChatCommands.Parsers.Bool("require-water"))
+            .HandleWith(CmdOverrideSnowRequiresWater)
+        .EndSubCommand()
+
+        // Sub-command to restore all overrides
+        .BeginSubCommand("restoresettings")
+            .WithDescription(
+                "Restores all overridden configuration settings to the values originally loaded from the config file."
+            )
+            .HandleWith(CmdRestoreAllConfigSettings)
+        .EndSubCommand()
+
+        // Sub-command to update the config file with current override values
+        .BeginSubCommand("updateconfig")
+            .WithDescription(
+                "Updates the 'rainfillscontainers' mod configuration file with the current game configuration."
+            )
+            .HandleWith(CmdUpdateConfig)
+        .EndSubCommand();
+    }
+
+    private TextCommandResult CmdGetInfo(TextCommandCallingArgs args) {
+        StringBuilder sb = new();
+        sb.AppendLine("Current configuration");
+        sb.AppendLine("---------------------");
+        sb.AppendLine(string.Format("Rain check every {0}ms", this.config.rainCheckDeltaMS));
+
+        bool overridden = this.config.minimumPrecipitation != this.defaultConfig.minimumPrecipitation;
+        sb.AppendLine(string.Format(
+            "Minimum precipitation: {0}{1}",
+            this.config.minimumPrecipitation,
+            overridden ? " [overridden]" : ""
+        ));
+
+        overridden = this.config.fillRate != this.defaultConfig.fillRate;
+        sb.AppendLine(string.Format(
+            "Fill rate: {0}{1}",
+            this.config.fillRate,
+            overridden ? " [overridden]" : ""
+        ));
+
+        overridden = this.config.smallStorageFillRateMultiplier != this.defaultConfig.smallStorageFillRateMultiplier;
+        sb.AppendLine(string.Format(
+            "Small storage fill rate multiplier: {0}{1}",
+            this.config.smallStorageFillRateMultiplier,
+            overridden ? " [overridden]" : ""
+        ));
+
+        overridden = this.config.snowFillRateMultiplier != this.defaultConfig.snowFillRateMultiplier;
+        sb.AppendLine(string.Format(
+            "Snow fill rate multiplier: {0}{1}",
+            this.config.snowFillRateMultiplier,
+            overridden ? " [overridden]" : ""
+        ));
+
+        overridden = this.config.snowRequiresWater != this.defaultConfig.snowRequiresWater;
+        sb.AppendLine(string.Format(
+            "Snow requires water: {0}{1}",
+            this.config.snowRequiresWater,
+            overridden ? " [overridden]" : ""
+        ));
+
+        sb.AppendLine();
+
+        return TextCommandResult.Success(sb.ToString());
+    }
+
+    private TextCommandResult CmdOverrideMinimumPrecipitation(TextCommandCallingArgs args) {
+        float newValue = (float) args.Parsers[0].GetValue();
+        bool wasReset = newValue < 0.0f;
+        string verb = wasReset ? "reset" : "set";
+
+        if (newValue < 0.0f) {
+            RestoreMinimumPrecipitation();
+        } else {
+            OverrideMinimumPrecipitation(newValue);
+        }
+
+        return TextCommandResult.Success(string.Format(
+            "Minimum precipitation level {0} to {1}", verb, this.config.minimumPrecipitation
+        ));
+    }
+
+    private TextCommandResult CmdOverrideFillRate(TextCommandCallingArgs args) {
+        float newValue = (float) args.Parsers[0].GetValue();
+        bool wasReset = newValue < 0.0f;
+        string verb = wasReset ? "reset" : "set";
+
+        if (wasReset) {
+            RestoreFillRate();
+        } else {
+            OverrideFillRate(newValue);
+        }
+
+        return TextCommandResult.Success(string.Format(
+            "Fill rate {0} to {1}", verb, this.config.fillRate
+        ));
+    }
+
+    private TextCommandResult CmdOverrideSmallStorageFillRate(TextCommandCallingArgs args) {
+        float newValue = (float) args.Parsers[0].GetValue();
+        bool wasReset = newValue < 0.0f;
+        string verb = wasReset ? "reset" : "set";
+
+        if (wasReset) {
+            RestoreSmallStorageFillRateMultiplier();
+        } else {
+            OverrideSmallStorageFillRateMultiplier(newValue);
+        }
+
+        return TextCommandResult.Success(string.Format(
+            "Small storage fill rate multiplier {0} to {1}", verb, this.config.smallStorageFillRateMultiplier
+        ));
+    }
+
+    private TextCommandResult CmdOverrideSnowFillRate(TextCommandCallingArgs args) {
+        float newValue = (float) args.Parsers[0].GetValue();
+        bool wasReset = newValue < 0.0f;
+        string verb = wasReset ? "reset" : "set";
+
+        if (wasReset) {
+            RestoreSnowFillRateMultiplier();
+        } else {
+            OverrideSnowFillRateMultiplier(newValue);
+        }
+
+        return TextCommandResult.Success(string.Format(
+            "Snow fill rate multiplier {0} to {1}", verb, this.config.snowFillRateMultiplier
+        ));
+    }
+
+    private TextCommandResult CmdOverrideSnowRequiresWater(TextCommandCallingArgs args) {
+        bool newValue = (bool) args.Parsers[0].GetValue();
+
+        OverrideSnowRequiresWater(newValue);
+
+        return TextCommandResult.Success(string.Format(
+            "Snow {0}requires water already in the container to begin filling containers",
+            newValue == this.defaultConfig.snowRequiresWater ? "now " : "no longer "
+        ));
+    }
+
+    private TextCommandResult CmdRestoreAllConfigSettings(TextCommandCallingArgs args) {
+        RestoreMinimumPrecipitation();
+        RestoreFillRate();
+        RestoreSmallStorageFillRateMultiplier();
+        RestoreSnowFillRateMultiplier();
+        RestoreSnowRequiresWater();
+
+        return TextCommandResult.Success("Restored configurations to match the config file.");
+    }
+
+    private TextCommandResult CmdUpdateConfig(TextCommandCallingArgs args) {
+        UpdateConfigFile();
+
+        return TextCommandResult.Success("Updated configuration");
+    }
 
     public float OverrideMinimumPrecipitation(float minimumPrecipitation) {
-        if (minimumPrecipitation < 0.0f) {
-            this.overridenConfig.minimumPrecipitation = this.config.minimumPrecipitation;
-            this.config.minimumPrecipitation = minimumPrecipitation;
-        }
+        if (minimumPrecipitation >= 0.0f) this.config.minimumPrecipitation = minimumPrecipitation;
 
         return this.config.minimumPrecipitation;
     }
 
     public void RestoreMinimumPrecipitation() {
-        this.config.minimumPrecipitation = this.overridenConfig.minimumPrecipitation;
+        this.config.minimumPrecipitation = this.defaultConfig.minimumPrecipitation;
     }
 
     public float OverrideFillRate(float fillRate) {
-        if (fillRate < 0.0f) {
-            this.overridenConfig.fillRate = this.config.fillRate;
-            this.config.fillRate = fillRate;
-        }
+        if (fillRate >= 0.0f) this.config.fillRate = fillRate;
 
         return this.config.fillRate;
     }
 
     public void RestoreFillRate() {
-        this.config.fillRate = this.overridenConfig.fillRate;
+        this.config.fillRate = this.defaultConfig.fillRate;
     }
 
     public float OverrideSmallStorageFillRateMultiplier(float smallStorageFillRateMultiplier) {
-        if (smallStorageFillRateMultiplier < 0.0f) {
-            this.overridenConfig.smallStorageFillRateMultiplier = this.config.smallStorageFillRateMultiplier;
-            this.config.smallStorageFillRateMultiplier = smallStorageFillRateMultiplier;
-        }
+        if (smallStorageFillRateMultiplier >= 0.0f) this.config.smallStorageFillRateMultiplier = smallStorageFillRateMultiplier;
 
         return this.config.smallStorageFillRateMultiplier;
     }
 
     public void RestoreSmallStorageFillRateMultiplier() {
-        this.config.smallStorageFillRateMultiplier = this.overridenConfig.smallStorageFillRateMultiplier;
+        this.config.smallStorageFillRateMultiplier = this.defaultConfig.smallStorageFillRateMultiplier;
     }
 
     public float OverrideSnowFillRateMultiplier(float snowFillRateMultiplier) {
-        if (snowFillRateMultiplier > 0.0f) {
-            this.overridenConfig.snowFillRateMultiplier = this.config.snowFillRateMultiplier;
-            this.config.snowFillRateMultiplier = snowFillRateMultiplier;
-        }
+        if (snowFillRateMultiplier >= 0.0f) this.config.snowFillRateMultiplier = snowFillRateMultiplier;
 
         return this.config.snowFillRateMultiplier;
     }
 
     public void RestoreSnowFillRateMultiplier() {
-        this.config.snowFillRateMultiplier = this.overridenConfig.snowFillRateMultiplier;
+        this.config.snowFillRateMultiplier = this.defaultConfig.snowFillRateMultiplier;
     }
 
     public bool OverrideSnowRequiresWater(bool snowRequiresWater) {
-        this.overridenConfig.snowRequiresWater = this.config.snowRequiresWater;
         this.config.snowRequiresWater = snowRequiresWater;
 
         return this.config.snowRequiresWater;
     }
 
     public void RestoreSnowRequiresWater() {
-        this.config.snowRequiresWater = this.overridenConfig.snowRequiresWater;
+        this.config.snowRequiresWater = this.defaultConfig.snowRequiresWater;
     }
 
-    private void UpdateConfigFile(ICoreAPI api) {
-        api.StoreModConfig<RainFillsContainersConfig>(this.config, CONFIG_NAME);
+    private void UpdateConfigFile() {
+        this.Api.StoreModConfig<RainFillsContainersConfig>(this.config, CONFIG_NAME);
+
+        // Set defaults to match new config file
+        this.defaultConfig = new RainFillsContainersConfig(this.config);
     }
 }

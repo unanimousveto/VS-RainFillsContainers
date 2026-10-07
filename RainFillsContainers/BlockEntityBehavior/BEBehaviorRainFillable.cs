@@ -7,7 +7,6 @@ namespace RainFillsContainers;
 
 public class BEBehaviorRainFillable : BlockEntityBehavior {
     private RainFillsContainersModSystem ModSystem;
-
     private WeatherSystemServer WeatherSystem;
     private long rainListener;
     private float partialPortions = 0;
@@ -98,7 +97,7 @@ public class BEBehaviorRainFillable : BlockEntityBehavior {
         if (isGroundStorage || isShelf) evaluatedFillRate *= this.ModSystem.SmallStorageFillRateMultiplier;
 
         // Evaluate amount of rain added
-        this.partialPortions += precipitation * evaluatedFillRate / 0.4f;
+        this.partialPortions += precipitation * evaluatedFillRate;
 
         // Too little to add
         if (this.partialPortions < 1.0f) return;
