@@ -1,6 +1,7 @@
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
+using Vintagestory.API.Util;
 using Vintagestory.GameContent;
 
 namespace RainFillsContainers;
@@ -167,9 +168,10 @@ public class BEBehaviorRainFillable : BlockEntityBehavior {
         return precipitationRate;
     }
 
-    private static float TryPutLiquidToItemstack(ItemStack itemStack, ItemStack fluidStack, float quantityLitres, bool requireWater = false) {
+    private float TryPutLiquidToItemstack(ItemStack itemStack, ItemStack fluidStack, float quantityLitres, bool requireWater = false) {
         if (itemStack?.Collectible is BlockLiquidContainerBase container &&
-            !container.IsFull(itemStack)
+            !container.IsFull(itemStack) &&
+            !IsItemBlacklisted(itemStack.Collectible)
         ) {
             // For snow, make sure this container already holds water to melt into
             if (requireWater &&
@@ -182,7 +184,7 @@ public class BEBehaviorRainFillable : BlockEntityBehavior {
         return 0.0f;
     }
 
-    private static float TryPutLiquidToGroundStorage(BlockEntityGroundStorage groundStorage, ItemStack fluidStack, float quantityLitres, bool requireWater = false) {
+    private float TryPutLiquidToGroundStorage(BlockEntityGroundStorage groundStorage, ItemStack fluidStack, float quantityLitres, bool requireWater = false) {
         EnumGroundStorageLayout layout = groundStorage.StorageProps.Layout;
 
         int searchSlotCount = layout switch {
@@ -205,7 +207,7 @@ public class BEBehaviorRainFillable : BlockEntityBehavior {
         return totalLitresAdded;
     }
 
-    private static float TryPutLiquidToTopShelf(BlockEntityShelf shelf, ItemStack fluidStack, float quantityLitres, bool requireWater = false) {
+    private float TryPutLiquidToTopShelf(BlockEntityShelf shelf, ItemStack fluidStack, float quantityLitres, bool requireWater = false) {
         // Only check the top shelf (indices 4-7, inclusive)
         int startIndex = 4;
 
@@ -240,5 +242,13 @@ public class BEBehaviorRainFillable : BlockEntityBehavior {
         }
 
         return 0.0f;
+    }
+
+    private bool IsItemBlacklisted(CollectibleObject item) {
+        foreach (string entry in this.ModSystem.ItemBlacklist) {
+            if (WildcardUtil.Match(AssetLocation.Create(entry), item.Code)) return true;
+        }
+
+        return false;
     }
 }

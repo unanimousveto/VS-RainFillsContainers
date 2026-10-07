@@ -26,6 +26,9 @@ public class RainFillsContainersModSystem : ModSystem {
     public float MinimumPrecipitation => config.minimumPrecipitation;
     public float SnowThresholdTemp { get; private set; }
 
+    public string[] BlockBlacklist => config.blockBlacklist;
+    public string[] ItemBlacklist => config.itemBlacklist;
+
     public override void Start(ICoreAPI api) {
         base.Start(api);
 

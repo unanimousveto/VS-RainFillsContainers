@@ -13,6 +13,9 @@ public class RainFillsContainersConfig {
     public string[] blockBlacklist = [
         "verticalboiler-*"
     ];
+    public string[] itemBlacklist = [
+        "jug-*"
+    ];
 
     public RainFillsContainersConfig() {}
 
@@ -25,5 +28,6 @@ public class RainFillsContainersConfig {
         this.smallStorageFillRateMultiplier = config.smallStorageFillRateMultiplier;
         this.snowRequiresWater = config.snowRequiresWater;
         this.blockBlacklist = config.blockBlacklist.FastCopy(config.blockBlacklist.Length);
+        this.itemBlacklist = config.itemBlacklist.FastCopy(config.itemBlacklist.Length);
     }
 }
