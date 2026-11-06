@@ -1,5 +1,6 @@
-﻿using System.Linq;
+﻿using System.Collections.Generic;
 using System.Text;
+using RainFillsContainers.Api;
 using Vintagestory.API.Common;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
@@ -10,7 +11,7 @@ namespace RainFillsContainers;
 public class RainFillsContainersModSystem : ModSystem {
     const string CONFIG_NAME = "RainFillsContainers.json";
 
-    private ICoreAPI Api;
+    private ICoreAPI Api = null!;
 
     private RainFillsContainersConfig config = new();
     private RainFillsContainersConfig defaultConfig = new();
@@ -28,6 +29,84 @@ public class RainFillsContainersModSystem : ModSystem {
 
     public string[] BlockBlacklist => config.blockBlacklist;
     public string[] ItemBlacklist => config.itemBlacklist;
+
+    private readonly List<(IRainAcceptor container, float partialPortions)> activeContainers = [];
+
+    /// <summary>
+    /// Add a container to the list of active containers.
+    /// </summary>
+    /// <param name="container">The container to add.</param>
+    /// <returns>True if the container was added, false otherwise.</returns>
+    public void AddContainer(IRainAcceptor container)
+    {
+        // Multiple addition
+        if (activeContainers.FindIndex((entry) => entry.container == container) != -1)
+        {
+            Mod.Logger.Warning($"Attempt to add `{container.GetType().FullName}` to the list of active containers has been blocked. It is already in the list.");
+        }
+        else
+        {
+            activeContainers.Add((container, 0.0f));
+        }
+    }
+
+    /// <summary>
+    /// Remove a container from the list of active containers.
+    /// </summary>
+    /// <param name="container">The container to remove.</param>
+    public void RemoveContainer(IRainAcceptor container)
+    {
+        int ix = activeContainers.FindIndex((entry) => entry.container == container);
+        if (ix == -1) return;
+
+        activeContainers.RemoveAt(ix);
+    }
+
+    /// <summary>
+    /// Update a container's contents based on its reported weather conditions.
+    /// </summary>
+    /// <param name="container">The container to update.</param>
+    /// <param name="partialPortions">
+    /// The ammount of accummulated water that remains to be added after
+    /// previous updates have added the maximum number of full portions
+    /// to this container. Used to ensure that no less than the minimum
+    /// ammount of water is ever added to the container.
+    /// </param>
+    /// <returns>The ammount of water successfully added.</returns>
+    public float UpdateContainer(IRainAcceptor container, ref float partialPortions)
+    {
+        float precipitation = container.GetEffectivePrecipitation();
+        if (precipitation < MinimumPrecipitation) return 0.0f;
+
+        float evaluatedFillRate = FillRate * (RainCheckDeltaMS / 5000) * container.FillRateMultiplier;
+        if (container.IsPrecipitationSnow()) evaluatedFillRate *= SnowFillRateMultiplier;
+        if (evaluatedFillRate <= 0.0f) return 0.0f;
+
+        partialPortions += precipitation * evaluatedFillRate;
+        if (partialPortions < 1.0f) return 0.0f;
+
+        int portionsToAdd = (int) partialPortions;
+        partialPortions -= portionsToAdd;
+
+        float addLitresAmount = 0.1f * portionsToAdd;
+        float ammountAdded = container.TryToAddWater(addLitresAmount, SnowRequiresWater);
+        if (ammountAdded <= 0.0f) partialPortions = 0.0f;
+        return ammountAdded;
+    }
+
+    public float UpdateAllContainers()
+    {
+        float ammountAdded = 0.0f;
+
+        for (int ix = 0; ix < activeContainers.Count; ix++)
+        {
+            var (container, partialPortions) = activeContainers[ix];
+            ammountAdded += UpdateContainer(container, ref partialPortions);
+            activeContainers[ix] = (container, partialPortions);
+        }
+
+        return ammountAdded;
+    }
 
     public override void Start(ICoreAPI api) {
         base.Start(api);

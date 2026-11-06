@@ -9,7 +9,7 @@ namespace RainFillsContainers.Api;
 
 public class BEBRainAcceptingBlock : BlockEntityBehavior, IRainAcceptor
 {
-    protected internal RainFillsContainersModSystem modSystem = null!;
+    protected RainFillsContainersModSystem modSystem = null!;
     protected WeatherSystemBase weatherSystem = null!;
 
     public virtual float FillRateMultiplier => 1.0f;
@@ -100,5 +100,29 @@ public class BEBRainAcceptingBlock : BlockEntityBehavior, IRainAcceptor
 
         weatherSystem = Api.ModLoader.GetModSystem<WeatherSystemBase>();
         if (weatherSystem is null) throw new InvalidOperationException("Unable to get weather system.");
+
+        if (Api.Side != EnumAppSide.Server) return;
+        modSystem.AddContainer(this);
+        modSystem.Mod.Logger.Debug($"Block of type `{Block.GetType().FullName}` at ({Blockentity.Pos}) started waiting for rain.");
+    }
+    
+    public override void OnBlockRemoved()
+    {
+        if (Api.Side != EnumAppSide.Server) return;
+
+        modSystem.RemoveContainer(this);
+        modSystem.Mod.Logger.Debug($"Block of type `{Block.GetType().FullName}` at ({Blockentity.Pos}) stopped waiting for rain (removed).");
+
+        base.OnBlockRemoved();
+    }
+
+    public override void OnBlockUnloaded()
+    {
+        if (Api.Side != EnumAppSide.Server) return;
+
+        modSystem.RemoveContainer(this);
+        modSystem.Mod.Logger.Debug($"Block of type `{Block.GetType().FullName}` at ({Blockentity.Pos}) stopped waiting for rain (unloaded).");
+
+        base.OnBlockUnloaded();
     }
 }
