@@ -14,7 +14,7 @@ public class BEBRainAcceptingBlock : BlockEntityBehavior, IRainAcceptor
 
     public virtual float FillRateMultiplier => 1.0f;
 
-    protected BEBRainAcceptingBlock(BlockEntity blockentity) : base(blockentity) {}
+    public BEBRainAcceptingBlock(BlockEntity blockentity) : base(blockentity) {}
 
     /// <summary>
     /// Check if a block position is exposed to rain.
@@ -72,10 +72,10 @@ public class BEBRainAcceptingBlock : BlockEntityBehavior, IRainAcceptor
     /// <returns>The ammount of water sucessfully added.</returns>
     protected float TryToAddWaterToContainer(BlockLiquidContainerBase container, float desiredLitres, bool requireWater)
     {
-        int waterId = Api.World.GetItem(new AssetLocation("waterportion"))?.Id ?? 0;
-        if (requireWater && container.GetContent(Blockentity.Pos)?.Id != waterId) return 0.0f;
+        var waterItem = Api.World.GetItem(new AssetLocation("waterportion"));
+        if (requireWater && container.GetContent(Blockentity.Pos)?.Id != waterItem?.Id) return 0.0f;
 
-        var waterStack = new ItemStack(new Item(waterId), int.MaxValue);
+        var waterStack = new ItemStack(waterItem, 1000);
         return container.TryPutLiquid(Blockentity.Pos, waterStack, desiredLitres);
     }
 

@@ -30,6 +30,7 @@ public class RainFillsContainersModSystem : ModSystem {
     public string[] BlockBlacklist => config.blockBlacklist;
     public string[] ItemBlacklist => config.itemBlacklist;
 
+    private long rainCheckEvent;
     private readonly List<(IRainAcceptor container, float partialPortions)> activeContainers = [];
 
     /// <summary>
@@ -79,7 +80,9 @@ public class RainFillsContainersModSystem : ModSystem {
         if (precipitation < MinimumPrecipitation) return 0.0f;
 
         float evaluatedFillRate = FillRate * (RainCheckDeltaMS / 5000) * container.FillRateMultiplier;
-        if (container.IsPrecipitationSnow()) evaluatedFillRate *= SnowFillRateMultiplier;
+
+        bool isSnow = container.IsPrecipitationSnow();
+        if (isSnow) evaluatedFillRate *= SnowFillRateMultiplier;
         if (evaluatedFillRate <= 0.0f) return 0.0f;
 
         partialPortions += precipitation * evaluatedFillRate;
@@ -89,7 +92,7 @@ public class RainFillsContainersModSystem : ModSystem {
         partialPortions -= portionsToAdd;
 
         float addLitresAmount = 0.1f * portionsToAdd;
-        float ammountAdded = container.TryToAddWater(addLitresAmount, SnowRequiresWater);
+        float ammountAdded = container.TryToAddWater(addLitresAmount, isSnow && SnowRequiresWater);
         if (ammountAdded <= 0.0f) partialPortions = 0.0f;
         return ammountAdded;
     }
@@ -108,12 +111,18 @@ public class RainFillsContainersModSystem : ModSystem {
         return ammountAdded;
     }
 
+    public override bool ShouldLoad(EnumAppSide forSide)
+    {
+        return forSide == EnumAppSide.Server;
+    }
+
     public override void Start(ICoreAPI api) {
         base.Start(api);
+        if (api.Side != EnumAppSide.Server) return;
 
         api.RegisterBlockEntityBehaviorClass(
-            "RainFillsContainers.RainFillable",
-            typeof(BEBehaviorRainFillable)
+            "RainAcceptingBlock",
+            typeof(BEBRainAcceptingBlock)
         );
 
         Mod.Logger.Event("Started 'RainFillsContainers' mod");
@@ -131,7 +140,6 @@ public class RainFillsContainersModSystem : ModSystem {
 
         WeatherSystemServer weatherSystem = this.Api.ModLoader.GetModSystem<WeatherSystemServer>();
         WeatherDataReader weatherData = weatherSystem.getWeatherDataReader();
-
         this.SnowThresholdTemp = weatherData.BlendedWeatherData.snowThresholdTemp;
 
         // Add the RainFillable behavior to blocks
@@ -139,53 +147,38 @@ public class RainFillsContainersModSystem : ModSystem {
         int blacklistedBlocksCount = 0;
 
         foreach (Block block in this.Api.World.Blocks) {
-            if (block is not BlockPitkiln &&
-                (
-                    block is BlockLiquidContainerBase ||
-                    block is BlockGroundStorage ||
-                    block is BlockShelf
-                )
-            ) {
+            if (block is not BlockPitkiln && block is BlockLiquidContainerBase) {
                 string blockName = block.Code.ToString();
 
                 if (IsBlockBlacklisted(block)) {
-                    this.Mod.Logger.VerboseDebug(
-                        "Skipped adding 'RainFillable' block entity behavior to '{0}' (blacklisted)",
-                        blockName
-                    );
-
+                    Mod.Logger.VerboseDebug($"Skipped adding 'RainFillable' block entity behavior to '{blockName}' (blacklisted).");
                     blacklistedBlocksCount++;
                     continue;
                 }
 
-                BlockEntityBehaviorType behavior = new() {
-                    Name = "RainFillsContainers.RainFillable",
-                    properties = null
-                };
-
+                BlockEntityBehaviorType behavior = new() { Name = "RainAcceptingBlock", properties = null };
                 block.BlockEntityBehaviors = block.BlockEntityBehaviors.Append(behavior);
-
-                Mod.Logger.VerboseDebug(
-                    "Added 'RainFillable' block entity behavior to '{0}'",
-                    blockName
-                );
-
+                Mod.Logger.VerboseDebug($"Added 'RainAcceptingBlock' block entity behavior to '{blockName}'.");
                 affectedBlocksCount++;
             }
         }
 
-        Mod.Logger.Debug(
-            "Added 'RainFillable' block entity behavior to {0} blocks",
-            [affectedBlocksCount]
-        );
-
-        Mod.Logger.Debug(
-            "Blacklist blocked {0} ({1} listed) blocks from receiving the 'RainFillable' block entity behavior",
+        Mod.Logger.Event($"Added rain accepting block entity behaviors to {affectedBlocksCount} blocks");
+        Mod.Logger.Event(
+            "Blacklist blocked {0} ({1} listed) blocks from receiving rain accepting block entity behaviors.",
             blacklistedBlocksCount,
             this.config.blockBlacklist.Length
         );
 
         RegisterCommands();
+
+        rainCheckEvent = Api.Event.RegisterGameTickListener(dt => UpdateAllContainers(), RainCheckDeltaMS);
+    }
+
+    public override void Dispose()
+    {
+        Api.Event.UnregisterGameTickListener(rainCheckEvent);
+        base.Dispose();
     }
 
     private void TryLoadConfig() {
