@@ -111,6 +111,29 @@ public class RainFillsContainersModSystem : ModSystem {
         return ammountAdded;
     }
 
+    private static void RegisterBlockEntityBehaviors(ICoreAPI api)
+    {
+        api.RegisterBlockEntityBehaviorClass("RainAcceptingBlock", typeof(BEBRainAcceptingBlock));
+        api.RegisterBlockEntityBehaviorClass("RainAcceptingBarrel", typeof(BEBRainAcceptingBarrel));
+    }
+
+    private static BlockEntityBehaviorType? GetBlockEntityBehaviorType(Block block)
+    {
+        if (block is not BlockPitkiln && block is BlockLiquidContainerBase)
+        {
+            if (block is BlockBarrel)
+            {
+                return new BlockEntityBehaviorType() { Name = "RainAcceptingBarrel", properties = null };
+            }
+            else
+            {
+                return new BlockEntityBehaviorType() { Name = "RainAcceptingBlock", properties = null };
+            }
+        }
+
+        return null;
+    }
+
     public override bool ShouldLoad(EnumAppSide forSide)
     {
         return forSide == EnumAppSide.Server;
@@ -120,10 +143,7 @@ public class RainFillsContainersModSystem : ModSystem {
         base.Start(api);
         if (api.Side != EnumAppSide.Server) return;
 
-        api.RegisterBlockEntityBehaviorClass(
-            "RainAcceptingBlock",
-            typeof(BEBRainAcceptingBlock)
-        );
+        RegisterBlockEntityBehaviors(api);
 
         Mod.Logger.Event("Started 'RainFillsContainers' mod");
     }
@@ -156,9 +176,11 @@ public class RainFillsContainersModSystem : ModSystem {
                     continue;
                 }
 
-                BlockEntityBehaviorType behavior = new() { Name = "RainAcceptingBlock", properties = null };
-                block.BlockEntityBehaviors = block.BlockEntityBehaviors.Append(behavior);
-                Mod.Logger.VerboseDebug($"Added 'RainAcceptingBlock' block entity behavior to '{blockName}'.");
+                var behaviorType = GetBlockEntityBehaviorType(block);
+                if (behaviorType is null) continue;
+                block.BlockEntityBehaviors = block.BlockEntityBehaviors.Append(behaviorType);
+
+                Mod.Logger.VerboseDebug($"Added '{behaviorType.Name}' block entity behavior to '{blockName}'.");
                 affectedBlocksCount++;
             }
         }
