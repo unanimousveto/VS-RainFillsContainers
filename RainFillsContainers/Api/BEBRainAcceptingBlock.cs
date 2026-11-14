@@ -61,7 +61,7 @@ public class BEBRainAcceptingBlock : BlockEntityBehavior, IRainAcceptor
     }
 
     /// <summary>
-    /// Attempt to add water to the given container.
+    /// Attempt to add water to the given container block.
     /// </summary>
     /// <param name="container">The container to add to.</param>
     /// <param name="desiredLitres">The ammount of water to add.</param>
@@ -70,13 +70,37 @@ public class BEBRainAcceptingBlock : BlockEntityBehavior, IRainAcceptor
     /// added.
     /// </param>
     /// <returns>The ammount of water sucessfully added.</returns>
-    protected float TryToAddWaterToContainer(BlockLiquidContainerBase container, float desiredLitres, bool requireWater)
+    protected float TryToAddWaterToBlock(BlockLiquidContainerBase container, float desiredLitres, bool requireWater)
     {
         var waterItem = Api.World.GetItem(new AssetLocation("waterportion"));
         if (requireWater && container.GetContent(Blockentity.Pos)?.Id != waterItem?.Id) return 0.0f;
 
         var waterStack = new ItemStack(waterItem, 1000);
         return container.TryPutLiquid(Blockentity.Pos, waterStack, desiredLitres);
+    }
+
+    /// <summary>
+    /// Attempt to add water to the given container item stack.
+    /// </summary>
+    /// <param name="itemStack">The item stack with the container.</param>
+    /// <param name="desiredLitres">The ammount of water to add.</param>
+    /// <param name="requireWater">
+    /// Whether water must be present in the container before more can be
+    /// added.
+    /// </param>
+    /// <returns>The ammount of water sucessfully added.</returns>
+    protected float TryToAddWaterToItemStack(ItemStack? itemStack, float desiredLitres, bool requireWater)
+    {
+        if (itemStack?.Collectible is BlockLiquidContainerBase container)
+        {
+            var waterItem = Api.World.GetItem(new AssetLocation("waterportion"));
+            if (requireWater && container.GetContent(Blockentity.Pos)?.Id != waterItem?.Id) return 0.0f;
+
+            var waterStack = new ItemStack(waterItem, 1000);
+            return container.TryPutLiquid(itemStack, waterStack, desiredLitres);
+        }
+
+        return 0.0f;
     }
 
     public virtual float TryToAddWater(float desiredLitres, bool requireWater = false)
@@ -87,7 +111,7 @@ public class BEBRainAcceptingBlock : BlockEntityBehavior, IRainAcceptor
             return 0.0f;
         }
 
-        return TryToAddWaterToContainer(container, desiredLitres, requireWater);
+        return TryToAddWaterToBlock(container, desiredLitres, requireWater);
     }
 
     [MemberNotNull(nameof(modSystem), nameof(weatherSystem))]

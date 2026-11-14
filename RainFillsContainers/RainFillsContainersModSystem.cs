@@ -115,20 +115,29 @@ public class RainFillsContainersModSystem : ModSystem {
     {
         api.RegisterBlockEntityBehaviorClass("RainAcceptingBlock", typeof(BEBRainAcceptingBlock));
         api.RegisterBlockEntityBehaviorClass("RainAcceptingBarrel", typeof(BEBRainAcceptingBarrel));
+        api.RegisterBlockEntityBehaviorClass("RainAcceptingGroundStorage", typeof(BEBRainAcceptingGroundStorage));
+        api.RegisterBlockEntityBehaviorClass("RainAcceptingShelf", typeof(BEBRainAcceptingShelf));
     }
 
     private static BlockEntityBehaviorType? GetBlockEntityBehaviorType(Block block)
     {
-        if (block is not BlockPitkiln && block is BlockLiquidContainerBase)
+        if (block is BlockPitkiln) return null;
+
+        if (block is BlockBarrel)
         {
-            if (block is BlockBarrel)
-            {
-                return new BlockEntityBehaviorType() { Name = "RainAcceptingBarrel", properties = null };
-            }
-            else
-            {
-                return new BlockEntityBehaviorType() { Name = "RainAcceptingBlock", properties = null };
-            }
+            return new BlockEntityBehaviorType() { Name = "RainAcceptingBarrel", properties = null };
+        }
+        else if (block is BlockGroundStorage)
+        {
+            return new BlockEntityBehaviorType() { Name = "RainAcceptingGroundStorage", properties = null };
+        }
+        else if (block is BlockShelf)
+        {
+            return new BlockEntityBehaviorType() { Name = "RainAcceptingShelf", properties = null };
+        }
+        else if (block is BlockLiquidContainerBase)
+        {
+            return new BlockEntityBehaviorType() { Name = "RainAcceptingBlock", properties = null };
         }
 
         return null;
@@ -167,17 +176,17 @@ public class RainFillsContainersModSystem : ModSystem {
         int blacklistedBlocksCount = 0;
 
         foreach (Block block in this.Api.World.Blocks) {
-            if (block is not BlockPitkiln && block is BlockLiquidContainerBase) {
-                string blockName = block.Code.ToString();
+            string blockName = block.Code.ToString();
 
-                if (IsBlockBlacklisted(block)) {
-                    Mod.Logger.VerboseDebug($"Skipped adding 'RainFillable' block entity behavior to '{blockName}' (blacklisted).");
-                    blacklistedBlocksCount++;
-                    continue;
-                }
+            if (IsBlockBlacklisted(block)) {
+                Mod.Logger.VerboseDebug($"Skipped adding rain accepting behavior to '{blockName}' (blacklisted).");
+                blacklistedBlocksCount++;
+                continue;
+            }
 
-                var behaviorType = GetBlockEntityBehaviorType(block);
-                if (behaviorType is null) continue;
+            var behaviorType = GetBlockEntityBehaviorType(block);
+            if (behaviorType is not null)
+            {
                 block.BlockEntityBehaviors = block.BlockEntityBehaviors.Append(behaviorType);
 
                 Mod.Logger.VerboseDebug($"Added '{behaviorType.Name}' block entity behavior to '{blockName}'.");
