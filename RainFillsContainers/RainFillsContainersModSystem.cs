@@ -287,9 +287,21 @@ public class RainFillsContainersModSystem : ModSystem {
         UpdateConfigFile();
     }
 
-    private bool IsBlockBlacklisted(Block block) {
-        foreach (string entry in this.config.blockBlacklist) {
+    public bool IsBlockBlacklisted(Block block)
+    {
+        foreach (string entry in config.blockBlacklist)
+        {
             if (WildcardUtil.Match(AssetLocation.Create(entry), block.Code)) return true;
+        }
+
+        return false;
+    }
+
+    public bool IsItemBlacklisted(CollectibleObject item)
+    {
+        foreach (string entry in config.itemBlacklist)
+        {
+            if (WildcardUtil.Match(AssetLocation.Create(entry), item.Code)) return true;
         }
 
         return false;

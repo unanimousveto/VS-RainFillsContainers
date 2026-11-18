@@ -91,7 +91,10 @@ public class BEBRainAcceptingBlock : BlockEntityBehavior, IRainAcceptor
     /// <returns>The ammount of water sucessfully added.</returns>
     protected float TryToAddWaterToItemStack(ItemStack? itemStack, float desiredLitres, bool requireWater)
     {
-        if (itemStack?.Collectible is BlockLiquidContainerBase container)
+        if (
+            itemStack?.Collectible is BlockLiquidContainerBase container &&
+            !modSystem.IsItemBlacklisted(itemStack.Collectible)
+        )
         {
             var waterItem = Api.World.GetItem(new AssetLocation("waterportion"));
             if (requireWater && container.GetContent(Blockentity.Pos)?.Id != waterItem?.Id) return 0.0f;
