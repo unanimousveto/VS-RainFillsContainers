@@ -280,6 +280,9 @@ public class RainFillsContainersModSystem : ModSystem {
             );
         }
 
+        BEBRainAcceptingGroundStorage.ConfigurableFillRate = config.smallStorageFillRateMultiplier;
+        BEBRainAcceptingShelf.ConfigurableFillRate = config.smallStorageFillRateMultiplier;
+
         if (this.config.snowFillRateMultiplier < 0.0f) {
             this.config.snowFillRateMultiplier = this.defaultConfig.snowFillRateMultiplier;
 
@@ -548,11 +551,17 @@ public class RainFillsContainersModSystem : ModSystem {
     public float OverrideSmallStorageFillRateMultiplier(float smallStorageFillRateMultiplier) {
         if (smallStorageFillRateMultiplier >= 0.0f) this.config.smallStorageFillRateMultiplier = smallStorageFillRateMultiplier;
 
+        BEBRainAcceptingGroundStorage.ConfigurableFillRate = config.smallStorageFillRateMultiplier;
+        BEBRainAcceptingShelf.ConfigurableFillRate = config.smallStorageFillRateMultiplier;
+
         return this.config.smallStorageFillRateMultiplier;
     }
 
     public void RestoreSmallStorageFillRateMultiplier() {
         this.config.smallStorageFillRateMultiplier = this.defaultConfig.smallStorageFillRateMultiplier;
+
+        BEBRainAcceptingGroundStorage.ConfigurableFillRate = config.smallStorageFillRateMultiplier;
+        BEBRainAcceptingShelf.ConfigurableFillRate = config.smallStorageFillRateMultiplier;
     }
 
     public float OverrideSnowFillRateMultiplier(float snowFillRateMultiplier) {
