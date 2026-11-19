@@ -2,6 +2,7 @@
 using System.Text;
 using RainFillsContainers.Api;
 using Vintagestory.API.Common;
+using Vintagestory.API.Datastructures;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
 using Vintagestory.GameContent;
@@ -117,6 +118,7 @@ public class RainFillsContainersModSystem : ModSystem {
         api.RegisterBlockEntityBehaviorClass("RainAcceptingBarrel", typeof(BEBRainAcceptingBarrel));
         api.RegisterBlockEntityBehaviorClass("RainAcceptingGroundStorage", typeof(BEBRainAcceptingGroundStorage));
         api.RegisterBlockEntityBehaviorClass("RainAcceptingShelf", typeof(BEBRainAcceptingShelf));
+        api.RegisterBlockEntityBehaviorClass("RainAcceptingOffsetBlock", typeof(BEBRainAcceptingOffsetBlock));
     }
 
     private static BlockEntityBehaviorType? GetBlockEntityBehaviorType(Block block)
@@ -134,6 +136,13 @@ public class RainFillsContainersModSystem : ModSystem {
         else if (block is BlockShelf)
         {
             return new BlockEntityBehaviorType() { Name = "RainAcceptingShelf", properties = null };
+        }
+        else if (block is BlockBoiler)
+        {
+            return new BlockEntityBehaviorType() {
+                Name = "RainAcceptingOffsetBlock",
+                properties = JsonObject.FromJson("{xOffset: 0, yOffset: 1, zOffset: 0}")
+            };
         }
         else if (block is BlockLiquidContainerBase)
         {
@@ -208,7 +217,7 @@ public class RainFillsContainersModSystem : ModSystem {
 
     public override void Dispose()
     {
-        Api.Event.UnregisterGameTickListener(rainCheckEvent);
+        Api?.Event.UnregisterGameTickListener(rainCheckEvent);
         base.Dispose();
     }
 
