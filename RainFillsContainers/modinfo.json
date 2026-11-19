@@ -8,7 +8,7 @@
         "unanimousveto"
     ],
     "description": "Rain fills opened barrels and ground storage.",
-    "version": "1.3.1",
+    "version": "1.4.0",
     "dependencies": {
         "game": "1.22.0",
         "survival": "1.22.0"
